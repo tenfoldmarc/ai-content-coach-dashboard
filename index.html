@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Content Coach — @tenfoldmarc</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --cyan: #00F5FF;
+    --cyan-dim: rgba(0,245,255,0.15);
+    --cyan-glow: rgba(0,245,255,0.4);
+    --pink: #FF006E;
+    --pink-dim: rgba(255,0,110,0.15);
+    --green: #39FF14;
+    --green-dim: rgba(57,255,20,0.15);
+    --yellow: #FFE600;
+    --bg: #05050a;
+    --bg2: #0a0a12;
+    --bg3: #0f0f1a;
+    --border: rgba(0,245,255,0.12);
+    --border-hot: rgba(0,245,255,0.35);
+    --text: #e0f0ff;
+    --text-dim: #4a6070;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Bricolage Grotesque', sans-serif;
+    --chat-width: 340px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 70% 40% at 50% -10%, rgba(0,245,255,0.06) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,245,255,0.015) 40px, rgba(0,245,255,0.015) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,245,255,0.015) 40px, rgba(0,245,255,0.015) 41px);
+  }
+
+  /* SCANLINES */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 32px 48px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(180deg, rgba(0,245,255,0.04) 0%, transparent 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.4;
+  }
+  .header-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cyan);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-badge::before {
+    content: '//';
+    color: var(--pink);
+  }
+  .header h1 {
+    font-size: 38px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 40px rgba(0,245,255,0.2);
+  }
+  .header h1 span { color: var(--cyan); }
+  .header-meta {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    margin-right: 6px;
+    animation: blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* CENTERED LAYOUT */
+  .page-wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* MAIN */
+  .main { padding: 28px 48px; }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .section-title::before { content: '>_'; color: var(--pink); font-size: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-hot), transparent); }
+
+  /* STAT CARDS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5,1fr);
+    gap: 14px;
+    margin-bottom: 44px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 22px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .stat-card:hover {
+    border-color: var(--border-hot);
+    box-shadow: 0 0 20px rgba(0,245,255,0.08);
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    opacity: 0.7;
+  }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--cyan);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,245,255,0.4);
+  }
+  .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+
+  /* TWO COL */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 44px; }
+
+  /* CARD */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 26px;
+    position: relative;
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* POSTS TABLE */
+  .posts-table { width: 100%; border-collapse: collapse; }
+  .posts-table th {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: left;
+    padding: 0 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .posts-table td {
+    padding: 13px 10px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0,245,255,0.05);
+    vertical-align: middle;
+  }
+  .posts-table tr:last-child td { border-bottom: none; }
+  .posts-table tr:hover td { background: rgba(0,245,255,0.03); }
+  .rank { font-family: var(--mono); font-weight: 700; color: var(--cyan); font-size: 14px; width: 28px; }
+  .post-caption { color: var(--text); font-weight: 500; max-width: 240px; }
+  .post-caption a { color: var(--text); text-decoration: none; }
+  .post-caption a:hover { color: var(--cyan); }
+  .badge-winner {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: rgba(255,0,110,0.12);
+    color: var(--pink);
+    border: 1px solid rgba(255,0,110,0.4);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin-left: 8px;
+  }
+  .metric { font-family: var(--mono); font-weight: 700; }
+  .metric.high { color: var(--green); text-shadow: 0 0 10px rgba(57,255,20,0.4); }
+  .metric.mid { color: var(--cyan); }
+  .metric.low { color: var(--text-dim); }
+  .bar-bg { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; width: 70px; }
+  .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+
+  /* COMPETITOR CARDS */
+  .comp-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 44px; }
+  .comp-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .comp-card:hover {
+    border-color: var(--border-hot);
+    box-shadow: 0 0 24px rgba(0,245,255,0.07);
+  }
+  .comp-header { display: flex; align-items: center; gap: 10px; }
+  .comp-avatar {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border-hot);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 14px; font-weight: 700; color: var(--cyan);
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(0,245,255,0.15);
+  }
+  .comp-name { font-weight: 700; font-size: 13px; color: var(--text); }
+  .comp-handle { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+  .comp-stats { display: flex; gap: 12px; }
+  .comp-stat { text-align: center; }
+  .comp-stat-val { font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--cyan); }
+  .comp-stat-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+  .comp-top-post {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 12px;
+  }
+  .comp-post-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-dim); margin-bottom: 5px; }
+  .comp-post-views { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--green); text-shadow: 0 0 10px rgba(57,255,20,0.3); }
+  .comp-post-caption { font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
+  .comp-post-link { font-family: var(--mono); font-size: 10px; color: var(--cyan); margin-top: 5px; text-decoration: none; display: inline-block; }
+  .comp-post-link:hover { text-shadow: 0 0 8px var(--cyan-glow); }
+  .comp-insight { font-size: 12px; color: var(--text-dim); line-height: 1.5; padding-top: 8px; border-top: 1px solid var(--border); }
+  .comp-insight strong { color: var(--text); }
+
+  /* COACHING PANELS */
+  .insight-row { display: flex; gap: 16px; margin-bottom: 44px; }
+  .insight-panel {
+    flex: 1;
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 24px;
+    border: 1px solid var(--border);
+  }
+  .insight-panel.steal { border-color: rgba(57,255,20,0.2); }
+  .insight-panel.stop { border-color: rgba(255,0,110,0.2); }
+  .insight-panel.gap { border-color: rgba(0,245,255,0.2); }
+  .insight-panel-title {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .steal .insight-panel-title { color: var(--green); }
+  .stop .insight-panel-title { color: var(--pink); }
+  .gap .insight-panel-title { color: var(--cyan); }
+  .insight-item { display: flex; gap: 10px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+  .insight-item:last-child { margin-bottom: 0; }
+  .insight-num {
+    flex-shrink: 0; width: 20px; height: 20px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    margin-top: 2px;
+  }
+  .steal .insight-num { background: rgba(57,255,20,0.12); color: var(--green); }
+  .stop .insight-num { background: rgba(255,0,110,0.12); color: var(--pink); }
+  .gap .insight-num { background: rgba(0,245,255,0.12); color: var(--cyan); }
+  .insight-item strong { color: var(--text); }
+
+  /* ANGLES */
+  .angles-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-bottom: 44px; }
+  .angle-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    display: flex; gap: 14px; align-items: flex-start;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .angle-card:hover {
+    border-color: rgba(0,245,255,0.3);
+    box-shadow: 0 0 16px rgba(0,245,255,0.06);
+  }
+  .angle-num {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 22px; font-weight: 700;
+    color: rgba(0,245,255,0.15);
+    line-height: 1; width: 36px;
+  }
+  .angle-hook { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 5px; line-height: 1.4; }
+  .angle-why { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .angle-cta { font-family: var(--mono); font-size: 10px; color: var(--pink); margin-top: 7px; font-weight: 700; letter-spacing: 0.05em; }
+
+  /* CHART */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* KEY INSIGHT BOX */
+  .insight-box {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding: 12px 14px;
+    background: var(--bg3);
+    border-radius: 6px;
+    border-left: 3px solid var(--cyan);
+  }
+  .insight-box strong { color: var(--cyan); }
+
+  /* REFRESH BUTTON */
+  .refresh-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    background: transparent;
+    border: 1px solid var(--border-hot);
+    border-radius: 5px;
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 10px;
+    transition: background 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+  }
+  .refresh-btn:hover:not(:disabled) {
+    background: rgba(0,245,255,0.08);
+    box-shadow: 0 0 12px rgba(0,245,255,0.15);
+  }
+  .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .refresh-icon { font-size: 13px; display: inline-block; transition: transform 0.6s; }
+  .refresh-btn.spinning .refresh-icon { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* REFRESH PROGRESS OVERLAY */
+  .refresh-overlay {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(5,5,10,0.97);
+    border-top: 2px solid var(--cyan);
+    z-index: 5000;
+    padding: 20px 48px;
+    font-family: var(--mono);
+    font-size: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .refresh-overlay.active { display: block; }
+  .refresh-overlay-title {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .refresh-log-line { color: var(--text-dim); line-height: 1.8; }
+  .refresh-log-line.error { color: var(--pink); }
+  .refresh-log-line.success { color: var(--green); }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 28px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .footer span { color: var(--cyan); }
+
+  /* ═══════════════════════════════
+     CHAT PANEL — above footer
+  ═══════════════════════════════ */
+  .chat-panel {
+    background: var(--bg2);
+    border-top: 2px solid var(--cyan);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -8px 48px rgba(0,245,255,0.12), inset 0 1px 0 rgba(0,245,255,0.15);
+    position: relative;
+  }
+  .chat-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: linear-gradient(180deg, rgba(0,245,255,0.06) 0%, transparent 100%);
+    pointer-events: none;
+  }
+  .chat-header {
+    padding: 18px 48px 16px;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .chat-header-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .chat-header-title::before { content: '◈'; color: var(--pink); }
+  .chat-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+  .chat-messages {
+    height: 220px;
+    overflow-y: auto;
+    padding: 14px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .chat-messages::-webkit-scrollbar { width: 3px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border-hot); border-radius: 2px; }
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 100%;
+  }
+  .msg-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .msg.user .msg-label { color: var(--pink); text-align: right; }
+  .msg.assistant .msg-label { color: var(--cyan); }
+  .msg-bubble {
+    font-size: 12.5px;
+    line-height: 1.6;
+    padding: 10px 13px;
+    border-radius: 8px;
+  }
+  .msg.user .msg-bubble {
+    background: rgba(255,0,110,0.1);
+    border: 1px solid rgba(255,0,110,0.2);
+    color: var(--text);
+    align-self: flex-end;
+    text-align: right;
+    border-radius: 8px 2px 8px 8px;
+  }
+  .msg.assistant .msg-bubble {
+    background: rgba(0,245,255,0.09);
+    border: 1px solid rgba(0,245,255,0.25);
+    color: var(--text);
+    border-radius: 2px 8px 8px 8px;
+    box-shadow: 0 0 16px rgba(0,245,255,0.06);
+  }
+  .msg.assistant .msg-bubble strong { color: var(--cyan); }
+  .msg.assistant .msg-bubble em { color: var(--green); font-style: normal; }
+  .typing-indicator {
+    display: flex; gap: 4px; align-items: center;
+    padding: 10px 13px;
+    background: rgba(0,245,255,0.06);
+    border: 1px solid rgba(0,245,255,0.15);
+    border-radius: 2px 8px 8px 8px;
+    width: fit-content;
+  }
+  .typing-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--cyan);
+    animation: typingBounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce { 0%,60%,100%{opacity:0.2;transform:translateY(0)} 30%{opacity:1;transform:translateY(-4px)} }
+  .chat-input-area {
+    padding: 12px 48px 18px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg3);
+  }
+  .chat-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border-hot);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    resize: none;
+    outline: none;
+    min-height: 42px;
+    max-height: 120px;
+    line-height: 1.5;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .chat-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.15);
+  }
+  .chat-input::placeholder { color: var(--text-dim); }
+  .chat-send {
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    width: 38px; height: 38px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: box-shadow 0.2s, transform 0.1s;
+  }
+  .chat-send:hover { box-shadow: 0 0 14px var(--cyan-glow); transform: scale(1.05); }
+  .chat-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .chat-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .chat-hint {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    padding: 4px 8px;
+    background: rgba(0,245,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chat-hint:hover {
+    background: rgba(0,245,255,0.12);
+    border-color: var(--border-hot);
+    color: var(--cyan);
+  }
+</style>
+<!-- Optional: rename config.example.js → config.js with your Anthropic API key -->
+<script src="config.js" onerror="void(0)"></script>
+<!-- Generated by fetch-data.js — your scraped Instagram posts -->
+<script src="data/data.js" onerror="void(0)"></script>
+</head>
+<body>
+
+<div class="page-wrap">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-badge">Content Intelligence System</div>
+    <h1>AI Content <span>Coach</span></h1>
+  </div>
+  <div class="header-meta">
+    <div style="margin-bottom:4px"><span class="live-dot"></span>LIVE DATA</div>
+    <div>@tenfoldmarc · March 7, 2026</div>
+    <div style="margin-top:4px; color: var(--cyan)">4 competitors analyzed</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
+      <span class="refresh-icon">↻</span> Refresh Data
+    </button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- STATS -->
+  <div class="section-title">Your Performance Overview</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Best Post Plays</div>
+      <div class="stat-value">16.7K</div>
+      <div class="stat-sub">"This is how you use AI in 2026"</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Comments</div>
+      <div class="stat-value">1,040</div>
+      <div class="stat-sub">Same post — comment bait is working</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Engagement</div>
+      <div class="stat-value">8.1%</div>
+      <div class="stat-sub">1,350 interactions on 16.7K plays</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Top Competitor</div>
+      <div class="stat-value">321K</div>
+      <div class="stat-sub">@agentic.james best post</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Play Gap</div>
+      <div class="stat-value">19×</div>
+      <div class="stat-sub">vs. top competitor post</div>
+    </div>
+  </div>
+
+  <!-- POSTS + CHART -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Your Posts — Ranked by Views</div>
+      <table class="posts-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Post</th><th>Views</th><th>Likes</th><th>ER%</th><th>Perf.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rank">1</td>
+            <td class="post-caption">
+              <a href="https://www.instagram.com/tenfoldmarc/" target="_blank">This is how you use AI in 2026</a>
+              <span class="badge-winner">Winner</span>
+            </td>
+            <td class="metric high">16,741</td><td>310</td><td class="metric high">8.1%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:100%"></div></div></td>
+          </tr>
+          <tr>
+            <td class="rank">2</td>
+            <td class="post-caption"><a href="https://www.instagram.com/tenfoldmarc/" target="_blank">Comment SKILLS to get my full system</a></td>
+            <td class="metric mid">5,781</td><td>81</td><td class="metric mid">2.8%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:35%"></div></div></td>
+          </tr>
+          <tr>
+            <td class="rank">3</td>
+            <td class="post-caption"><a href="https://www.instagram.com/tenfoldmarc/" target="_blank">7-figure businesses, zero employees</a></td>
+            <td class="metric mid">3,608</td><td>70</td><td class="metric mid">7.8%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:22%"></div></div></td>
+          </tr>
+          <tr>
+            <td class="rank">4</td>
+            <td class="post-caption"><a href="https://www.instagram.com/tenfoldmarc/" target="_blank">Anybody else feels that way?</a></td>
+            <td class="metric low">1,474</td><td>20</td><td class="metric low">1.5%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:9%"></div></div></td>
+          </tr>
+          <tr>
+            <td class="rank">5</td>
+            <td class="post-caption"><a href="https://www.instagram.com/tenfoldmarc/" target="_blank">Everybody will get on this train...</a></td>
+            <td class="metric low">834</td><td>10</td><td class="metric low">1.6%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:5%"></div></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Views by Post</div>
+      <div class="chart-wrap"><canvas id="viewsChart"></canvas></div>
+      <div class="insight-box">
+        <strong>Key Insight:</strong> Post #1 pulled <strong style="color:var(--green)">1,040 comments</strong> — 13× more than any other post. Comment-bait CTAs are working. Post #3 ("zero employees") has 7.8% ER on 3,608 plays — high engagement signal, needs more reach.
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPETITORS -->
+  <div class="section-title">Competitor Breakdown</div>
+  <div class="comp-grid">
+    <div class="comp-card">
+      <div class="comp-header">
+        <div class="comp-avatar">C</div>
+        <div><div class="comp-name">Chase H.</div><div class="comp-handle">@chase.h.ai</div></div>
+      </div>
+      <div class="comp-stats">
+        <div class="comp-stat"><div class="comp-stat-val">90K</div><div class="comp-stat-label">Best Post</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">2.2K</div><div class="comp-stat-label">Likes</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">747</div><div class="comp-stat-label">Comments</div></div>
+      </div>
+      <div class="comp-top-post">
+        <div class="comp-post-label">// Top Post</div>
+        <div class="comp-post-views">90,137 plays</div>
+        <div class="comp-post-caption">"Comment AGENT to get my Claude Code system"</div>
+        <a class="comp-post-link" href="https://www.instagram.com/chase.h.ai/" target="_blank">view profile →</a>
+      </div>
+      <div class="comp-insight"><strong>Pattern:</strong> Same CTA every single post — "Comment AGENT." Trains algorithm + audience. Every post = lead gen.</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-header">
+        <div class="comp-avatar">N</div>
+        <div><div class="comp-name">Noe Varner</div><div class="comp-handle">@noevarner.ai</div></div>
+      </div>
+      <div class="comp-stats">
+        <div class="comp-stat"><div class="comp-stat-val">35K</div><div class="comp-stat-label">Best Post</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">999</div><div class="comp-stat-label">Likes</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">131</div><div class="comp-stat-label">Comments</div></div>
+      </div>
+      <div class="comp-top-post">
+        <div class="comp-post-label">// Top Post (recent)</div>
+        <div class="comp-post-views">35,055 plays</div>
+        <div class="comp-post-caption">Latest content — consistent daily posting</div>
+        <a class="comp-post-link" href="https://www.instagram.com/noevarner.ai/" target="_blank">view profile →</a>
+      </div>
+      <div class="comp-insight"><strong>Pattern:</strong> Bold polarizing takes on tool wars. Declaring something dead = massive reach. Posts daily. Volume wins.</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-header">
+        <div class="comp-avatar">M</div>
+        <div><div class="comp-name">Matt Ganzak</div><div class="comp-handle">@mattganzak</div></div>
+      </div>
+      <div class="comp-stats">
+        <div class="comp-stat"><div class="comp-stat-val">81K</div><div class="comp-stat-label">Best Post</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">2.2K</div><div class="comp-stat-label">Likes</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">1.1K</div><div class="comp-stat-label">Comments</div></div>
+      </div>
+      <div class="comp-top-post">
+        <div class="comp-post-label">// Top Post</div>
+        <div class="comp-post-views">81,417 plays · 1,135 comments</div>
+        <div class="comp-post-caption">"End of days coming for Anthropic and OpenAI! Local LLMs are getting insane."</div>
+        <a class="comp-post-link" href="https://www.instagram.com/mattganzak/" target="_blank">view profile →</a>
+      </div>
+      <div class="comp-insight"><strong>Pattern:</strong> Controversy bait = debate = distribution. 1.1K comments from one prediction post. Disagreement = reach.</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-header">
+        <div class="comp-avatar">J</div>
+        <div><div class="comp-name">Agentic James</div><div class="comp-handle">@agentic.james</div></div>
+      </div>
+      <div class="comp-stats">
+        <div class="comp-stat"><div class="comp-stat-val">321K</div><div class="comp-stat-label">Best Post</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">8.5K</div><div class="comp-stat-label">Likes</div></div>
+        <div class="comp-stat"><div class="comp-stat-val">271</div><div class="comp-stat-label">Comments</div></div>
+      </div>
+      <div class="comp-top-post">
+        <div class="comp-post-label">// Top Post</div>
+        <div class="comp-post-views">320,910 plays · 8,452 likes</div>
+        <div class="comp-post-caption">"Claude code runs my life — here's my full stack"</div>
+        <a class="comp-post-link" href="https://www.instagram.com/agentic.james/" target="_blank">view profile →</a>
+      </div>
+      <div class="comp-insight"><strong>Pattern:</strong> Identity-first content "Claude runs my life." Makes Claude Code a personality, not just a tool. 19× your best post.</div>
+    </div>
+  </div>
+
+  <!-- COACHING REPORT -->
+  <div class="section-title">Coaching Report</div>
+  <div class="insight-row">
+    <div class="insight-panel steal">
+      <div class="insight-panel-title">✓ Steal These</div>
+      <div class="insight-item"><div class="insight-num">1</div><div><strong>Consistent CTA</strong> — Chase uses "Comment AGENT" on every post. Your #1 post got 1,040 comments. You have proof it works. One CTA, every post.</div></div>
+      <div class="insight-item"><div class="insight-num">2</div><div><strong>Identity-first hooks</strong> — James's 321K post: "Claude code runs my life." You haven't done one identity format. That's your #1 gap right now.</div></div>
+      <div class="insight-item"><div class="insight-num">3</div><div><strong>Bold prediction takes</strong> — Matt's "End of days for Anthropic/OpenAI" pulled 81K plays + 1.1K comments. Prediction = debate = distribution.</div></div>
+      <div class="insight-item"><div class="insight-num">4</div><div><strong>7.8% ER signal</strong> — "7-figure businesses, zero employees" has nearly as good ER as your #1. Promote that angle harder.</div></div>
+    </div>
+    <div class="insight-panel stop">
+      <div class="insight-panel-title">✕ Stop This</div>
+      <div class="insight-item"><div class="insight-num">1</div><div><strong>Tutorial-first hooks</strong> — "Here's how to..." hooks consistently underperform. The HOW is your product, not your content.</div></div>
+      <div class="insight-item"><div class="insight-num">2</div><div><strong>Vague hooks</strong> — "Anybody else feels that way?" got 1,474 plays. Zero-context hooks don't travel outside your existing audience.</div></div>
+      <div class="insight-item"><div class="insight-num">3</div><div><strong>Switching CTAs</strong> — ARMORY, COLD, SALES, SKILLS, CONTENT... you're training nobody. One CTA per cycle maximum.</div></div>
+      <div class="insight-item"><div class="insight-num">4</div><div><strong>Low-reach posts with no promotion</strong> — Post #3 has 7.8% ER but only 3.6K plays. High engagement = proven concept. That one needed a push.</div></div>
+    </div>
+    <div class="insight-panel gap">
+      <div class="insight-panel-title">→ The Gap</div>
+      <div class="insight-item"><div class="insight-num">1</div><div><strong>1,040 comment formula</strong> — You cracked it once. Your best post is 13× better on comments than anything else. Reverse engineer exactly what made it work and repeat.</div></div>
+      <div class="insight-item"><div class="insight-num">2</div><div><strong>GHL is yours alone</strong> — James does 321K plays and doesn't touch GoHighLevel. You own that lane by default. Nobody is competing.</div></div>
+      <div class="insight-item"><div class="insight-num">3</div><div><strong>19× reach gap to close</strong> — James's top post beats yours by 19×. His secret: identity content, not tutorial content. "Claude runs my life" → your version is "Claude Code runs my agency."</div></div>
+      <div class="insight-item"><div class="insight-num">4</div><div><strong>High ER, low reach = promote harder</strong> — "7-figure businesses, zero employees" at 7.8% ER is a proven concept. Run it as an ad or collab post.</div></div>
+    </div>
+  </div>
+
+  <!-- 10 ANGLES -->
+  <div class="section-title">10 Angles to Post Next</div>
+  <div class="angles-grid">
+    <div class="angle-card"><div class="angle-num">01</div><div><div class="angle-hook">"OpenClaw is dead. Here's what you should use instead."</div><div class="angle-why">Noe got 315K views on this exact take. You have the same opinion — say it louder.</div><div class="angle-cta">CTA: Comment SWITCH</div></div></div>
+    <div class="angle-card"><div class="angle-num">02</div><div><div class="angle-hook">"I replaced my entire team with AI agents. Here's what happened to revenue."</div><div class="angle-why">Polarizing prediction format. You have real data. Use it.</div><div class="angle-cta">CTA: Comment AGENTS</div></div></div>
+    <div class="angle-card"><div class="angle-num">03</div><div><div class="angle-hook">"GoHighLevel + Claude Code is an unfair advantage. Nobody is talking about this."</div><div class="angle-why">Completely uncontested. GHL has millions of users who have no idea this is possible.</div><div class="angle-cta">CTA: Comment GHL</div></div></div>
+    <div class="angle-card"><div class="angle-num">04</div><div><div class="angle-hook">"Instantly AI + Claude Code is printing money. Here's the $10K setup."</div><div class="angle-why">You built this and made $10K. Most credible result. Lead with the number.</div><div class="angle-cta">CTA: Comment EMAIL</div></div></div>
+    <div class="angle-card"><div class="angle-num">05</div><div><div class="angle-hook">"This free tool + Claude Code makes your AI 10× smarter. (It's not what you think)"</div><div class="angle-why">Tool discovery format. James got 106K views on this. You haven't touched it.</div><div class="angle-cta">CTA: Comment TOOL</div></div></div>
+    <div class="angle-card"><div class="angle-num">06</div><div><div class="angle-hook">"Agency owners using AI in 2026 vs 2025 (meme format)"</div><div class="angle-why">Your humor post is your #1 at 13.8K views. Double down. Same format, different angle.</div><div class="angle-cta">CTA: Comment AGENCY</div></div></div>
+    <div class="angle-card"><div class="angle-num">07</div><div><div class="angle-hook">"50% of marketing agencies will be gone in 2 years. Here's the other 50%."</div><div class="angle-why">Matt got 4,291 comments on a similar take. Debate = reach.</div><div class="angle-cta">CTA: Comment FUTURE</div></div></div>
+    <div class="angle-card"><div class="angle-num">08</div><div><div class="angle-hook">"I gave Claude Code access to my GoHighLevel. It did things I didn't think were possible."</div><div class="angle-why">Vulnerability + discovery. GHL angle is 100% yours.</div><div class="angle-cta">CTA: Comment DEMO</div></div></div>
+    <div class="angle-card"><div class="angle-num">09</div><div><div class="angle-hook">"My competitor has 10× my views and posts half as much. I studied every post. Here's what I found."</div><div class="angle-why">Meta-content. Turns this dashboard into a video. Massive curiosity gap.</div><div class="angle-cta">CTA: Comment STUDY</div></div></div>
+    <div class="angle-card"><div class="angle-num">10</div><div><div class="angle-hook">"The cold email system that sent 600 emails yesterday while I slept."</div><div class="angle-why">You have this running. Lead with the outcome, not the tool.</div><div class="angle-cta">CTA: Comment COLD</div></div></div>
+  </div>
+
+</div>
+
+<!-- CHAT PANEL -->
+<div class="chat-panel">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title">AI Content Coach</div>
+      <div class="chat-sub" id="chatSub">Ask about your data, competitors, or next move</div>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg assistant">
+      <div class="msg-label">Coach</div>
+      <div class="msg-bubble">Hey Marc. Fresh data loaded. Your best post just hit <strong>1,040 comments</strong> — that's 13× more than any other post. Comment-bait is your formula. Meanwhile @agentic.james is at <strong>321K plays</strong> with identity-first content — 19× your best. That's the gap. What do you want to dig into?</div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="chat-hints">
+      <div class="chat-hint" onclick="sendHint(this)">Why did my #1 post win?</div>
+      <div class="chat-hint" onclick="sendHint(this)">What should I post next?</div>
+      <div class="chat-hint" onclick="sendHint(this)">How do I close the 19× gap?</div>
+      <div class="chat-hint" onclick="sendHint(this)">Best CTA to use right now?</div>
+    </div>
+    <div class="chat-input-wrap">
+      <textarea class="chat-input" id="chatInput" placeholder="Ask your AI coach..." rows="1"></textarea>
+      <button class="chat-send" id="chatSend" onclick="sendMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  AI Content Coach · <span>@tenfoldmarc</span> · Powered by Claude Code + Apify · March 7, 2026
+</div>
+
+</div><!-- /page-wrap -->
+
+<!-- REFRESH PROGRESS OVERLAY -->
+<div class="refresh-overlay" id="refreshOverlay">
+  <div class="refresh-overlay-title">
+    <span class="refresh-icon" style="animation:spin 1s linear infinite;display:inline-block">↻</span>
+    Refreshing Data — do not close this window
+  </div>
+  <div id="refreshLog"></div>
+</div>
+
+<script>
+// ─── Sample Data (fallback if data/data.js not loaded) ───
+const SAMPLE_DATA = {
+  generatedAt: null,
+  yourHandle: '@tenfoldmarc',
+  yourPosts: [
+    { id: '1', caption: 'This is how you use AI in 2026', views: 16741, likes: 310, comments: 1040, er: 8.1, date: '2026-03-07', url: 'https://www.instagram.com/tenfoldmarc/' },
+    { id: '2', caption: 'Comment SKILLS to get my full system', views: 5781, likes: 81, comments: 81, er: 2.8, date: '2026-03-05', url: 'https://www.instagram.com/tenfoldmarc/' },
+    { id: '3', caption: '7-figure businesses, zero employees', views: 3608, likes: 70, comments: 213, er: 7.8, date: '2026-03-03', url: 'https://www.instagram.com/tenfoldmarc/' },
+    { id: '4', caption: 'Anybody else feels that way?', views: 1474, likes: 20, comments: 2, er: 1.5, date: '2026-03-01', url: 'https://www.instagram.com/tenfoldmarc/' },
+    { id: '5', caption: 'Everybody will get on this train...', views: 834, likes: 10, comments: 3, er: 1.6, date: '2026-02-28', url: 'https://www.instagram.com/tenfoldmarc/' },
+  ],
+  competitors: [
+    { handle: '@chase.h.ai', name: 'Chase H.', posts: [], bestPost: { views: 90137, likes: 2243, comments: 747, caption: 'Comment AGENT to get my Claude Code system' }, pattern: 'Same CTA every single post — "Comment AGENT." Trains algorithm + audience. Every post = lead gen.' },
+    { handle: '@noevarner.ai', name: 'Noe Varner', posts: [], bestPost: { views: 35055, likes: 999, comments: 131, caption: 'Latest content — consistent daily posting' }, pattern: 'Bold polarizing takes on tool wars. Declaring something dead = massive reach. Posts daily. Volume wins.' },
+    { handle: '@mattganzak', name: 'Matt Ganzak', posts: [], bestPost: { views: 81417, likes: 2200, comments: 1135, caption: '"End of days coming for Anthropic and OpenAI! Local LLMs are getting insane."' }, pattern: 'Controversy bait = debate = distribution. 1.1K comments from one prediction post. Disagreement = reach.' },
+    { handle: '@agentic.james', name: 'Agentic James', posts: [], bestPost: { views: 320910, likes: 8452, comments: 271, caption: '"Claude code runs my life — here\'s my full stack"' }, pattern: 'Identity-first content "Claude runs my life." Makes Claude Code a personality, not just a tool. 19× your best post.' },
+  ]
+};
+
+// Use live scraped data if available, otherwise fall back to sample
+const DATA = (typeof window.CONTENT_DATA !== 'undefined') ? window.CONTENT_DATA : SAMPLE_DATA;
+
+// Show data source indicator
+if (window.CONTENT_DATA) {
+  const badge = document.querySelector('.header-badge');
+  if (badge) badge.textContent = `Live Data · Scraped ${new Date(DATA.generatedAt).toLocaleDateString()}`;
+} else {
+  const badge = document.querySelector('.header-badge');
+  if (badge) badge.innerHTML = 'Sample Data · <span style="color:var(--pink)">Run fetch-data.js for live data</span>';
+}
+
+// ─── API Key Management ───────────────────────────────────
+function getApiKey() {
+  return (typeof window.ANTHROPIC_API_KEY !== 'undefined' && window.ANTHROPIC_API_KEY)
+    || localStorage.getItem('coach_api_key');
+}
+
+function showApiKeyModal() {
+  if (document.getElementById('apiKeyModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'apiKeyModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  modal.innerHTML = `
+    <div style="background:#0a0a12;border:1px solid rgba(0,245,255,0.35);border-radius:12px;padding:36px;max-width:480px;width:90%;box-shadow:0 0 60px rgba(0,245,255,0.12);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#00F5FF;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:16px;">// Setup Required</div>
+      <h2 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:-0.02em;font-family:'Bricolage Grotesque',sans-serif;">Add Your Anthropic API Key</h2>
+      <p style="font-size:13px;color:#4a6070;margin-bottom:24px;line-height:1.6;">Paste your API key to enable the AI coach chat. Stored in your browser — never sent anywhere except Anthropic's API.</p>
+      <input id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." style="width:100%;background:#05050a;border:1px solid rgba(0,245,255,0.3);border-radius:6px;padding:12px 14px;color:#e0f0ff;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;margin-bottom:14px;box-sizing:border-box;" />
+      <button onclick="saveApiKey()" style="width:100%;background:#00F5FF;color:#000;border:none;border-radius:6px;padding:12px;font-weight:800;cursor:pointer;font-size:14px;font-family:'Bricolage Grotesque',sans-serif;">Save & Start Coaching</button>
+      <p style="font-size:10px;color:#4a6070;margin-top:12px;text-align:center;font-family:'JetBrains Mono',monospace;">Or add ANTHROPIC_API_KEY to config.js for permanent storage</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('apiKeyInput')?.focus(), 100);
+  document.getElementById('apiKeyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveApiKey();
+  });
+}
+
+function saveApiKey() {
+  const input = document.getElementById('apiKeyInput');
+  const key = input.value.trim();
+  if (!key || !key.startsWith('sk-ant')) {
+    input.style.borderColor = 'rgba(255,0,110,0.6)';
+    input.placeholder = 'Must start with sk-ant...';
+    return;
+  }
+  localStorage.setItem('coach_api_key', key);
+  document.getElementById('apiKeyModal').remove();
+}
+
+// ─── System Prompt Builder ────────────────────────────────
+function buildSystemPrompt(data) {
+  const sorted = [...data.yourPosts].sort((a, b) => b.views - a.views);
+  const posts = sorted.slice(0, 25).map((p, i) =>
+    `- Post #${i+1}: "${p.caption}" — ${p.views.toLocaleString()} plays, ${p.likes} likes, ${p.comments} comments, ${p.er}% ER (${p.date || 'n/a'})`
+  ).join('\n');
+
+  const bestPost = sorted[0] || {};
+  const avgViews = Math.round(data.yourPosts.reduce((s, p) => s + p.views, 0) / (data.yourPosts.length || 1));
+
+  const competitors = data.competitors.map(c => {
+    const allPosts = c.posts && c.posts.length > 0 ? c.posts : [];
+    const topPosts = allPosts.length > 0
+      ? allPosts.slice(0, 5).map(p => `    · "${p.caption}" — ${(p.views||0).toLocaleString()} plays, ${p.comments||0} comments`).join('\n')
+      : `    · Best: "${c.bestPost?.caption || 'N/A'}" — ${(c.bestPost?.views||0).toLocaleString()} plays`;
+    return `${c.handle} (${c.name}):\n${topPosts}\n  Pattern: ${c.pattern || 'See posts above'}`;
+  }).join('\n\n');
+
+  return `You are Marc's AI Content Coach — a sharp, direct marketing strategist who knows his data cold. No fluff, no filler. Be specific, reference actual numbers.
+
+MARC'S HANDLE: ${data.yourHandle}
+NICHE: Claude Code automation for business owners and marketing agency owners
+DATA: ${data.generatedAt ? `Scraped ${new Date(data.generatedAt).toLocaleDateString()} (${data.yourPosts.length} posts saved)` : 'Sample data — run fetch-data.js to load live scraped posts'}
+
+YOUR POSTS (all ${data.yourPosts.length} saved, sorted by views):
+${posts}
+
+KEY STATS:
+- Best post: "${bestPost.caption}" — ${(bestPost.views||0).toLocaleString()} plays, ${bestPost.comments||0} comments
+- Avg views across all posts: ${avgViews.toLocaleString()}
+
+COMPETITORS (all saved posts analyzed):
+${competitors}
+
+WHAT MARC SHOULD STEAL:
+1. Identity-first hooks ("Claude Code runs my agency") — James got 320K plays with this format
+2. Consistent single CTA per campaign — Marc's best post proves comment-bait works (check the comments count)
+3. Bold predictions / controversy (Matt's "End of days for Anthropic/OpenAI" pulled 81K plays, 1.1K comments)
+4. High volume posting — Noe posts daily, consistency beats perfection
+
+WHAT MARC SHOULD STOP:
+1. Tutorial-first hooks ("here's how to...") — the HOW is the product, not the content
+2. Vague hooks with no specific claim or identity
+3. Switching CTAs every video — pick one word per 2-week cycle
+4. Hedging takes instead of declaring bold opinions
+
+MARC'S UNCLAIMED ANGLES (nobody else covers these):
+- Claude Code + GoHighLevel (agency ops) — zero competition
+- Claude Code + cold email / Instantly AI (real agency results, real numbers)
+- Marketing agency owner POV vs. developer perspective
+- He runs real client accounts — authentic results competitors can't fake
+
+Respond in 2-4 short paragraphs max. Reference actual numbers from the data. Don't say "great question."`;
+}
+
+// ─── Chart ───────────────────────────────────────────────
+const ctx = document.getElementById('viewsChart').getContext('2d');
+const chartPosts = [...DATA.yourPosts].sort((a, b) => b.views - a.views).slice(0, 5);
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: chartPosts.map(p => p.caption.length > 22 ? p.caption.slice(0, 22) + '…' : p.caption),
+    datasets: [{
+      label: 'Plays',
+      data: chartPosts.map(p => p.views),
+      backgroundColor: ['rgba(0,245,255,0.7)','rgba(0,245,255,0.45)','rgba(0,245,255,0.25)','rgba(0,245,255,0.15)','rgba(0,245,255,0.1)'],
+      borderColor: 'rgba(0,245,255,0.3)',
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0a0a12',
+        borderColor: 'rgba(0,245,255,0.3)',
+        borderWidth: 1,
+        titleColor: '#00F5FF',
+        bodyColor: '#e0f0ff',
+        callbacks: { label: c => `  ${c.raw.toLocaleString()} plays` }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(0,245,255,0.04)' },
+        ticks: { color: '#4a6070', font: { family: 'JetBrains Mono', size: 9 }, maxRotation: 20 }
+      },
+      y: {
+        grid: { color: 'rgba(0,245,255,0.04)' },
+        ticks: {
+          color: '#4a6070',
+          font: { family: 'JetBrains Mono', size: 9 },
+          callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v
+        }
+      }
+    }
+  }
+});
+
+// ─── Chat ────────────────────────────────────────────────
+const SYSTEM_PROMPT = buildSystemPrompt(DATA);
+const messages = [];
+
+function addMessage(role, content) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-label">${role === 'user' ? 'You' : 'Coach'}</div>
+    <div class="msg-bubble">${content.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>')}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.id = 'typingIndicator';
+  div.className = 'msg assistant';
+  div.innerHTML = `<div class="msg-label">Coach</div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typingIndicator');
+  if (t) t.remove();
+}
+
+function sendHint(el) {
+  document.getElementById('chatInput').value = el.textContent;
+  sendMessage();
+}
+
+// ─── Refresh Data ────────────────────────────────────────────
+function refreshData() {
+  const btn     = document.getElementById('refreshBtn');
+  const overlay = document.getElementById('refreshOverlay');
+  const log     = document.getElementById('refreshLog');
+
+  if (!IS_LOCAL_SERVER) {
+    // File opened directly — can't run server-side scripts
+    addMessage('assistant', '**To refresh data**, you need to run the server:\n\n`node server.js`\n\nThen open **http://localhost:3003** — the refresh button will work there.');
+    document.getElementById('chatMessages').scrollTop = 9999;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('spinning');
+  btn.querySelector('.refresh-icon').textContent = '↻';
+  overlay.classList.add('active');
+  log.innerHTML = '';
+
+  const addLog = (text, cls = '') => {
+    const div = document.createElement('div');
+    div.className = `refresh-log-line ${cls}`;
+    div.textContent = text;
+    log.appendChild(div);
+    overlay.scrollTop = overlay.scrollHeight;
+  };
+
+  const source = new EventSource('/api/refresh');
+
+  source.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.done) {
+      source.close();
+      if (data.success) {
+        addLog('✓ Done — reloading dashboard...', 'success');
+        btn.querySelector('.refresh-icon').textContent = '✓';
+        setTimeout(() => window.location.reload(), 1800);
+      } else {
+        addLog('✗ Refresh failed — check terminal for details.', 'error');
+        btn.disabled = false;
+        btn.classList.remove('spinning');
+        overlay.classList.remove('active');
+      }
+    } else if (data.error) {
+      addLog('! ' + data.error, 'error');
+    } else if (data.line) {
+      addLog(data.line);
+    }
+  };
+
+  source.onerror = () => {
+    source.close();
+    addLog('✗ Connection to server lost.', 'error');
+    btn.disabled = false;
+    btn.classList.remove('spinning');
+  };
+}
+
+// ─── Detect if running via local server ──────────────────────
+const IS_LOCAL_SERVER = window.location.protocol === 'http:' && window.location.hostname === 'localhost';
+const SERVER_BASE = ''; // empty = same origin (works when served by server.js)
+const chatSub = document.getElementById('chatSub');
+if (chatSub) chatSub.textContent = IS_LOCAL_SERVER
+  ? 'Powered by Claude Code · Ask about your data, competitors, or next move'
+  : 'Ask about your data, competitors, or next move (API key required)';
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const btn   = document.getElementById('chatSend');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  // If opened as a file (not via server), need an API key
+  if (!IS_LOCAL_SERVER) {
+    const apiKey = getApiKey();
+    if (!apiKey) { showApiKeyModal(); return; }
+  }
+
+  input.value = '';
+  input.style.height = 'auto';
+  btn.disabled = true;
+
+  addMessage('user', text);
+  messages.push({ role: 'user', content: text });
+  showTyping();
+
+  try {
+    let data;
+    if (IS_LOCAL_SERVER) {
+      // Use local server — no API key needed, routes through Claude Code
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: SYSTEM_PROMPT, messages })
+      });
+      data = await res.json();
+    } else {
+      // Direct API call — needs API key in config.js or localStorage
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': getApiKey(),
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 600,
+          system: SYSTEM_PROMPT,
+          messages
+        })
+      });
+      data = await res.json();
+    }
+
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content[0].text;
+    messages.push({ role: 'assistant', content: reply });
+    removeTyping();
+    addMessage('assistant', reply);
+  } catch(e) {
+    removeTyping();
+    addMessage('assistant', `Error: ${e.message || 'Connection failed.'}`);
+  }
+
+  btn.disabled = false;
+  input.focus();
+}
+
+// Auto-resize textarea
+document.getElementById('chatInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// Enter to send (Shift+Enter for newline)
+document.getElementById('chatInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Only prompt for API key if NOT using local server
+document.getElementById('chatInput').addEventListener('focus', function() {
+  if (!IS_LOCAL_SERVER && !getApiKey()) showApiKeyModal();
+});
+</script>
+</body>
+</html>

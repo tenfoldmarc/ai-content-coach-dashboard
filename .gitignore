@@ -1,0 +1,7 @@
+config.js
+config.json
+.env
+data/data.js
+data/posts/
+data/videos/
+node_modules/

@@ -1,0 +1,16 @@
+{
+  "name": "ai-content-coach-dashboard",
+  "version": "1.0.0",
+  "description": "Scrape Instagram, transcribe reels, spy on competitors — then chat with Claude about all of it.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "fetch": "node fetch-data.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

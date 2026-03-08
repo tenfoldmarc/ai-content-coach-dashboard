@@ -1,0 +1,16 @@
+{
+  "yourHandle": "yourinstagramhandle",
+  "yourName": "Your Name",
+  "postsPerAccount": 25,
+  "competitors": [
+    { "handle": "competitor1handle", "name": "Competitor 1", "pattern": "" },
+    { "handle": "competitor2handle", "name": "Competitor 2", "pattern": "" },
+    { "handle": "competitor3handle", "name": "Competitor 3", "pattern": "" }
+  ],
+  "tools": {
+    "ytdlp": "yt-dlp",
+    "whisper": "whisper",
+    "ffmpeg": "ffmpeg",
+    "whisperModel": "base"
+  }
+}
